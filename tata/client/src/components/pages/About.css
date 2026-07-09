@@ -1,0 +1,170 @@
+/* ═══════════════════════════════════════
+   ABOUT PAGE
+═══════════════════════════════════════ */
+
+.about-page {
+  min-height: 100vh;
+  background-color: transparent;
+  color: #f8fafc;
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+/* ── Hero ───────────────────────────── */
+.about-hero {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 80px 24px 56px;
+  text-align: center;
+}
+
+.about-eyebrow {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #38bdf8;
+  padding: 5px 14px;
+  border-radius: 99px;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  margin-bottom: 20px;
+}
+
+.about-title {
+  font-family: 'Syne', 'Inter', sans-serif;
+  font-size: clamp(2rem, 6vw, 3.2rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #f8fafc;
+  line-height: 1.1;
+  margin-bottom: 16px;
+}
+.about-title-gradient {
+  background: linear-gradient(135deg, #38bdf8, #818cf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.about-subtitle {
+  font-size: 1rem;
+  color: #475569;
+  max-width: 460px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+/* ── Team ───────────────────────────── */
+.about-team-wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px 56px;
+}
+
+.about-section-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #334155;
+  margin-bottom: 16px;
+}
+
+.about-team-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.team-card {
+  background: rgba(10, 15, 30, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 24px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+}
+.team-card:hover {
+  border-color: rgba(56, 189, 248, 0.15);
+  transform: translateY(-4px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+}
+
+.team-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.team-info { display: flex; flex-direction: column; gap: 2px; }
+
+.team-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+.team-role {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.team-college {
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+/* ── Project card ───────────────────── */
+.about-project-wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px 96px;
+}
+
+.about-project-card {
+  background: rgba(56, 189, 248, 0.03);
+  border: 1px solid rgba(56, 189, 248, 0.1);
+  border-radius: 20px;
+  padding: 36px;
+}
+
+.about-project-text {
+  font-size: 0.92rem;
+  color: #64748b;
+  line-height: 1.8;
+}
+
+.about-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.about-tag {
+  padding: 4px 13px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 0.75rem;
+  color: #475569;
+  font-weight: 500;
+}
+
+/* ── Responsive ─────────────────────── */
+@media (max-width: 560px) {
+  .about-team-grid { grid-template-columns: 1fr; }
+  .about-hero { padding: 60px 20px 40px; }
+  .about-team-wrap, .about-project-wrap { padding-left: 16px; padding-right: 16px; }
+}
