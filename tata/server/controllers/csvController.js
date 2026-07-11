@@ -18,3 +18,15 @@ exports.getDatasets = async (req, res) => {
   const datasets = await Dataset.find();
   res.json(datasets);
 };
+
+exports.getLatestDataset = async (req, res) => {
+  try {
+    const latestDataset = await Dataset.findOne().sort({ _id: -1 });
+    if (!latestDataset) {
+      return res.status(404).json({ message: "No data found" });
+    }
+    res.json(latestDataset);
+  } catch (error) {
+    res.status(500).json({ error: "Server error fetching latest data" });
+  }
+};
