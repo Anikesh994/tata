@@ -8,7 +8,7 @@ const DataTable = () => {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    axios.get("http://localhost:5000/api/csv")
+    axios.get(`${import.meta.env.VITE_API_URL}/api/csv`)
       .then(res => {
         const latestData = res.data[res.data.length - 1]?.data || [];
         setData(latestData);

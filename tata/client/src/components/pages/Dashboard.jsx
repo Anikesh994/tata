@@ -45,7 +45,7 @@ export default function Dashboard() {
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const res = await axios.post("http://localhost:5000/api/csv/upload", fd);
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/csv/upload`, fd);
       // Use the data returned directly from the upload response
       // so we never need to re-fetch from the DB
       const uploaded = res.data?.data || [];

@@ -11,7 +11,7 @@ const CSVUploader = () => {
     formData.append("file", file);
 
     try {
-      await axios.post("http://localhost:5000/api/csv/upload", formData);
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/csv/upload`, formData);
       alert("Uploaded Successfully!");
       window.location.reload();
     } catch (error) {
