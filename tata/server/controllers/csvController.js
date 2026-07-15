@@ -1,16 +1,23 @@
-const fs = require("fs");
+const { Readable } = require("stream");
 const csv = require("csv-parser");
 const Dataset = require("../models/Dataset");
 
 exports.uploadCSV = async (req, res) => {
   const results = [];
-  fs.createReadStream(req.file.path)
+
+  // Parse directly from the in-memory buffer — no temp file needed
+  const stream = Readable.from(req.file.buffer);
+
+  stream
     .pipe(csv())
     .on("data", (data) => results.push(data))
     .on("end", async () => {
       const dataset = new Dataset({ name: req.file.originalname, data: results });
       await dataset.save();
       res.json(dataset);
+    })
+    .on("error", (err) => {
+      res.status(500).json({ error: "Failed to parse CSV", details: err.message });
     });
 };
 
