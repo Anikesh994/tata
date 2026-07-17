@@ -44,6 +44,15 @@ const Navbar = () => {
           );
         })}
 
+        <Show when="signed-in">
+          <Link
+            to="/my-exports"
+            className={`nav-link ${isActive("/my-exports") ? "nav-link-active" : ""}`}
+          >
+            My Exports
+          </Link>
+        </Show>
+
         <div className="hidden md:block w-px h-5 bg-white/8 mx-2" />
 
         <Show when="signed-out">

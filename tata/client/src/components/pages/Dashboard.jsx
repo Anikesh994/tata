@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { useAuth } from "@clerk/react";
 import Navbar from "../Navbar";
 import ChartDisplay from "../ChartDisplay";
+import { savePdfLocally } from "../../utils/exportStorage";
 import "./Dashboard.css";
 
 const Toast = ({ message, type }) => (
@@ -14,6 +16,7 @@ const Toast = ({ message, type }) => (
 );
 
 export default function Dashboard() {
+  const { getToken } = useAuth();
   const [data, setData]               = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [file, setFile]               = useState(null);
@@ -96,8 +99,34 @@ export default function Dashboard() {
     y = await capture(".bento-row", y);
     y = await capture(".table-scroll", y);
     await capture(".chart-card", y);
-    doc.save("insightboard_dashboard.pdf");
-    showToast("PDF exported!", "success");
+
+    // Timestamped filename
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const fileName  = `insightboard_${timestamp}.pdf`;
+
+    // 1 — capture base64 BEFORE triggering download (jsPDF resets state after save)
+    const dataUri   = doc.output("datauristring");
+    const fileSize  = Math.round((dataUri.length * 3) / 4); // approx bytes
+
+    // 2 — trigger browser download
+    doc.save(fileName);
+
+    // 3 — save only metadata to the server (tiny payload, no file data)
+    try {
+      const token = await getToken();
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_URL}/api/exports`,
+        { fileName, exportType: "PDF", fileSize },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // 4 — store the actual PDF blob in IndexedDB using the DB record's _id
+      await savePdfLocally(res.data._id, dataUri);
+
+      showToast("PDF exported and saved to My Exports!", "success");
+    } catch {
+      showToast("PDF downloaded. Failed to save to My Exports.", "error");
+    }
   };
 
   const headers = filteredData.length ? Object.keys(filteredData[0]) : [];

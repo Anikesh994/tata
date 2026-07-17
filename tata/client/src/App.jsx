@@ -3,6 +3,7 @@ import Home from "./components/pages/Home";
 import Dashboard from "./components/pages/Dashboard";
 import About from "./components/pages/About";
 import Services from "./components/pages/Services";
+import MyExports from "./components/pages/MyExports";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
@@ -19,6 +20,16 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* My Exports — signed-in users only */}
+        <Route
+          path="/my-exports"
+          element={
+            <ProtectedRoute>
+              <MyExports />
             </ProtectedRoute>
           }
         />
