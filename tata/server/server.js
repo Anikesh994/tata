@@ -1,8 +1,10 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const bodyParser = require("body-parser");
 const dotenv = require("dotenv");
 const csvRoutes = require("./routes/csvRoutes");
+const exportRoutes = require("./routes/exportRoutes");
 
 dotenv.config();
 
@@ -22,7 +24,9 @@ app.use(cors({
   },
 }));
 
-app.use(express.json());
+// Increase body size limit to handle base64-encoded PDF exports (~5–15 MB)
+app.use(bodyParser.json({ limit: "25mb" }));
+app.use(bodyParser.urlencoded({ limit: "25mb", extended: true }));
 
 mongoose
   .connect(process.env.MONGO_URL)
@@ -30,6 +34,7 @@ mongoose
   .catch(err => console.log(err));
 
 app.use("/api/csv", csvRoutes);
+app.use("/api/exports", exportRoutes);
 
 // Export for Vercel serverless — only listen locally
 if (process.env.NODE_ENV !== "production") {
