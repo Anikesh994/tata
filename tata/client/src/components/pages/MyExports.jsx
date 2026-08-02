@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import api from "../../services/api";
 import { useAuth } from "@clerk/react";
 import Navbar from "../Navbar";
 import { getPdfLocally, deletePdfLocally } from "../../utils/exportStorage";
@@ -49,7 +49,7 @@ export default function MyExports() {
     setLoading(true);
     try {
       const token = await getToken();
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/exports`, {
+      const res = await api.get("/api/exports", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setExports(res.data);
@@ -100,7 +100,7 @@ export default function MyExports() {
     setDeleting(id);
     try {
       const token = await getToken();
-      await axios.delete(`${import.meta.env.VITE_API_URL}/api/exports/${id}`, {
+      await api.delete(`/api/exports/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       // Also wipe from IndexedDB

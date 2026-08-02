@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import axios from "axios";
+import { uploadCSV as apiUpload } from "../../services/api";
+import api from "../../services/api";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { useAuth } from "@clerk/react";
@@ -44,20 +45,29 @@ export default function Dashboard() {
 
   const handleUpload = async () => {
     if (!file) return;
+    // Client-side guard before wasting a network round-trip
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      return showToast("Only .csv files are supported.", "error");
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return showToast("File too large. Max size is 5 MB.", "error");
+    }
     setUploading(true);
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/csv/upload`, fd);
-      // Use the data returned directly from the upload response
-      // so we never need to re-fetch from the DB
-      const uploaded = res.data?.data || [];
+      const res = await apiUpload(fd);
+      // Server returns { success, message, data: { ...metadata, data: rows[] } }
+      const uploaded = res.data?.data?.data ?? [];
       setData(uploaded);
       setFilteredData(uploaded);
       setSearch("");
       showToast("CSV uploaded successfully!", "success");
       setFile(null);
-    } catch { showToast("Upload failed. Please try again.", "error"); }
+    } catch (err) {
+      const msg = err.response?.data?.message || "Upload failed. Please try again.";
+      showToast(msg, "error");
+    }
     finally   { setUploading(false); }
   };
 
@@ -114,8 +124,8 @@ export default function Dashboard() {
     // 3 — save only metadata to the server (tiny payload, no file data)
     try {
       const token = await getToken();
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/exports`,
+      const res = await api.post(
+        "/api/exports",
         { fileName, exportType: "PDF", fileSize },
         { headers: { Authorization: `Bearer ${token}` } }
       );

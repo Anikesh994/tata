@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { getDatasets } from "../../services/api";
 import "./DataTable.css";
 
 const DataTable = () => {
@@ -8,9 +8,10 @@ const DataTable = () => {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    axios.get(`${import.meta.env.VITE_API_URL}/api/csv`)
+    getDatasets()
       .then(res => {
-        const latestData = res.data[res.data.length - 1]?.data || [];
+        const datasets = res.data?.data ?? res.data ?? [];
+        const latestData = datasets[datasets.length - 1]?.data || [];
         setData(latestData);
         setFilteredData(latestData); // default filtered data = all data
       });
