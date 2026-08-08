@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import Navbar from "../Navbar";
 import { Show, SignUpButton } from "@clerk/react";
-import dashboardImg from "../../../libs/image.png";
+import dashboardImg from "/image.png";
 import "./Home.css";
 
 const features = [

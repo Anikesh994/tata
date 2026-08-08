@@ -32,18 +32,14 @@ const parseCSVBuffer = (buffer) =>
       .on("error", (err) => reject(err));
   });
 
-/** Upload a raw Buffer to Cloudinary as a CSV file */
-const uploadBufferToCloudinary = (buffer, originalName) =>
+/** Upload a raw Buffer to Cloudinary */
+const uploadBufferToCloudinary = (buffer, originalName, resourceType = "raw", format = "csv") =>
   new Promise((resolve, reject) => {
-    const publicId = `insightboard/${Date.now()}_${originalName.replace(/\.csv$/i, "")}`;
+    const baseName = originalName.replace(/\.[^.]+$/i, "");
+    const publicId = `insightboard/${Date.now()}_${baseName}`;
 
     const stream = cloudinary.uploader.upload_stream(
-      {
-        public_id:     publicId,
-        resource_type: "raw",       // required for non-image files
-        format:        "csv",
-        overwrite:     false,
-      },
+      { public_id: publicId, resource_type: resourceType, format, overwrite: false },
       (error, result) => {
         if (error) return reject(error);
         resolve(result);
@@ -81,21 +77,32 @@ exports.uploadCSV = asyncHandler(async (req, res) => {
     return sendError(res, MESSAGES.UPLOAD_FAILED, 502);
   }
 
-  // 3. Save only metadata to MongoDB — no raw rows
+  // 3. Also upload parsed JSON to Cloudinary for dashboard recovery after refresh
+  let jsonResult;
+  try {
+    const jsonBuffer = Buffer.from(JSON.stringify(rows));
+    jsonResult = await uploadBufferToCloudinary(jsonBuffer, originalname.replace(/\.csv$/i, ".json"), "raw", "json");
+  } catch (err) {
+    // Non-fatal: dashboard still works from the upload response
+    logger.warn(`JSON backup upload failed for "${originalname}": ${err.message}`);
+    jsonResult = null;
+  }
+
+  // 4. Save metadata to MongoDB
   const dataset = await Dataset.create({
     name:               originalname,
     fileSize:           size,
     cloudinaryUrl:      cloudinaryResult.secure_url,
     cloudinaryPublicId: cloudinaryResult.public_id,
+    jsonUrl:            jsonResult?.secure_url ?? null,
     rowCount:           rows.length,
     columns:            Object.keys(rows[0]),
-    uploadedBy:         req.auth?.userId ?? null,   // Clerk userId if auth is wired
+    uploadedBy:         req.clerkUserId ?? null,
   });
 
   logger.info(`Dataset uploaded: "${originalname}" | rows=${rows.length} | user=${dataset.uploadedBy ?? "anonymous"}`);
 
-  // 4. Return metadata + parsed rows so the client can render immediately
-  //    without a second round-trip to Cloudinary
+  // 5. Return metadata + parsed rows so the client can render immediately
   return sendSuccess(
     res,
     MESSAGES.UPLOAD_SUCCESS,
@@ -104,9 +111,11 @@ exports.uploadCSV = asyncHandler(async (req, res) => {
   );
 });
 
-/* ── Get all datasets (metadata only) ───────────────────── */
-exports.getDatasets = asyncHandler(async (_req, res) => {
-  const datasets = await Dataset.find()
+/* ── Get all datasets (scoped to current user) ───────────── */
+exports.getDatasets = asyncHandler(async (req, res) => {
+  // If auth middleware ran, filter by user; otherwise return all (public mode)
+  const filter = req.clerkUserId ? { uploadedBy: req.clerkUserId } : {};
+  const datasets = await Dataset.find(filter)
     .select("-__v")
     .sort({ createdAt: -1 })
     .lean();
@@ -114,9 +123,10 @@ exports.getDatasets = asyncHandler(async (_req, res) => {
   return sendSuccess(res, MESSAGES.DATASETS_FETCHED, datasets);
 });
 
-/* ── Get latest dataset metadata ────────────────────────── */
-exports.getLatestDataset = asyncHandler(async (_req, res) => {
-  const latest = await Dataset.findOne()
+/* ── Get latest dataset (scoped to current user) ─────────── */
+exports.getLatestDataset = asyncHandler(async (req, res) => {
+  const filter = req.clerkUserId ? { uploadedBy: req.clerkUserId } : {};
+  const latest = await Dataset.findOne(filter)
     .sort({ _id: -1 })
     .lean();
 

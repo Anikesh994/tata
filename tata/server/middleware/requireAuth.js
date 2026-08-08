@@ -14,20 +14,17 @@ async function requireAuth(req, res, next) {
       : null;
 
     if (!token) {
-      return res.status(401).json({ error: "Missing auth token" });
+      return res.status(401).json({ success: false, message: "Missing auth token." });
     }
 
-    // verifyToken is a standalone function — pass secretKey explicitly
     const payload = await verifyToken(token, {
       secretKey: process.env.CLERK_SECRET_KEY,
     });
 
-    // sub is the Clerk User ID (e.g. "user_...")
     req.clerkUserId = payload.sub;
     next();
   } catch (err) {
-    console.error("Auth error:", err.message);
-    return res.status(401).json({ error: "Invalid or expired token" });
+    return res.status(401).json({ success: false, message: "Invalid or expired token." });
   }
 }
 

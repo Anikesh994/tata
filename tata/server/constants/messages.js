@@ -20,6 +20,12 @@ module.exports = {
   DATASET_DELETED:     "Dataset deleted successfully.",
   DATASET_DELETE_FAIL: "Failed to delete dataset.",
 
+  // Exports / PDF
+  PDF_UPLOAD_SUCCESS:  "PDF exported and saved successfully.",
+  PDF_UPLOAD_FAILED:   "Failed to upload PDF. Please try again.",
+  INVALID_PDF_TYPE:    "Only PDF files are allowed.",
+  PDF_TOO_LARGE:       "PDF too large. Maximum allowed size is 20 MB.",
+
   // General
   ROUTE_NOT_FOUND:     "Route not found.",
   SERVER_ERROR:        "Internal server error.",

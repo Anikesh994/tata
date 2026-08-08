@@ -17,11 +17,12 @@ const ExportSchema = new mongoose.Schema(
       default: "PDF",
     },
     fileSize: {
-      type: Number, // bytes
+      type: Number,
       default: null,
     },
-    // NOTE: file data is NOT stored in the DB — it lives in browser IndexedDB.
-    // This keeps documents small and avoids payload limits entirely.
+    // Cloudinary URL enables cross-device PDF download
+    cloudinaryUrl:      { type: String, default: null },
+    cloudinaryPublicId: { type: String, default: null },
   },
   {
     timestamps: true,

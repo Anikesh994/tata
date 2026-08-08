@@ -10,15 +10,17 @@ const { uploadCSV, getDatasets, getLatestDataset, deleteDataset } =
   require("../controllers/csvController");
 const { validateCSVUpload }    = require("../validators/csvValidator");
 const { FILE_LIMITS }          = require("../constants/fileLimits");
+const optionalAuth             = require("../middleware/optionalAuth");
 
 const router = express.Router();
 
-// Multer only handles buffering + size cap.
-// MIME/ext validation is delegated to validateCSVUpload middleware.
 const upload = multer({
   storage: multer.memoryStorage(),
   limits:  { fileSize: FILE_LIMITS.MAX_SIZE_BYTES },
 });
+
+// optionalAuth attaches req.clerkUserId when a token is present
+router.use(optionalAuth);
 
 router.post(   "/upload",    upload.single("file"), validateCSVUpload, uploadCSV);
 router.get(    "/",          getDatasets);

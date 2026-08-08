@@ -1,69 +1,113 @@
-const Export = require("../models/Export");
-
 /**
- * POST /api/exports
- * Save export metadata only — no file data.
- * Body: { fileName, exportType, fileSize }
+ * controllers/exportController.js
+ * Manages PDF export metadata.
+ * PDFs are uploaded to Cloudinary server-side — API secret never exposed to client.
  */
-exports.saveExport = async (req, res) => {
+
+const { Readable }   = require("stream");
+const Export         = require("../models/Export");
+const { cloudinary } = require("../config/cloudinary");
+const asyncHandler   = require("../utils/asyncHandler");
+const { sendSuccess, sendError } = require("../utils/apiResponse");
+const MESSAGES       = require("../constants/messages");
+const logger         = require("../utils/logger");
+
+/* ── Helper: upload buffer to Cloudinary ─────────────────── */
+const uploadPDFToCloudinary = (buffer, fileName) =>
+  new Promise((resolve, reject) => {
+    const publicId = `insightboard/exports/${Date.now()}_${fileName.replace(/\.pdf$/i, "")}`;
+
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        public_id:     publicId,
+        resource_type: "raw",     // PDFs are non-image raw files
+        format:        "pdf",
+        overwrite:     false,
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+
+    Readable.from(buffer).pipe(stream);
+  });
+
+/* ── Upload PDF → Cloudinary → save metadata ─────────────── */
+exports.uploadPDF = asyncHandler(async (req, res) => {
+  // req.file validated by pdfValidator middleware
+  // req.clerkUserId set by requireAuth middleware
+  const { buffer, originalname, size } = req.file;
+
+  let cloudinaryResult;
   try {
-    const { fileName, exportType = "PDF", fileSize = null } = req.body;
-
-    if (!fileName) {
-      return res.status(400).json({ error: "fileName is required" });
-    }
-
-    const newExport = new Export({
-      clerkUserId: req.clerkUserId, // always from verified token, never from body
-      fileName,
-      exportType,
-      fileSize,
-    });
-
-    await newExport.save();
-    res.status(201).json(newExport);
+    cloudinaryResult = await uploadPDFToCloudinary(buffer, originalname);
   } catch (err) {
-    console.error("saveExport error:", err);
-    res.status(500).json({ error: "Failed to save export" });
+    logger.error(`PDF Cloudinary upload failed: ${err.message}`);
+    return sendError(res, MESSAGES.PDF_UPLOAD_FAILED, 502);
   }
-};
 
-/**
- * GET /api/exports
- * Return all export metadata for the authenticated user (newest first).
- */
-exports.getMyExports = async (req, res) => {
-  try {
-    const exports = await Export.find({ clerkUserId: req.clerkUserId })
-      .sort({ createdAt: -1 });
+  const newExport = await Export.create({
+    clerkUserId:        req.clerkUserId,
+    fileName:           originalname,
+    exportType:         "PDF",
+    fileSize:           size,
+    cloudinaryUrl:      cloudinaryResult.secure_url,
+    cloudinaryPublicId: cloudinaryResult.public_id,
+  });
 
-    res.json(exports);
-  } catch (err) {
-    console.error("getMyExports error:", err);
-    res.status(500).json({ error: "Failed to fetch exports" });
+  logger.info(`PDF exported: "${originalname}" | user=${req.clerkUserId}`);
+
+  return sendSuccess(res, MESSAGES.PDF_UPLOAD_SUCCESS, newExport, 201);
+});
+
+/* ── Save export metadata only (no file) ─────────────────── */
+exports.saveExport = asyncHandler(async (req, res) => {
+  const { fileName, exportType = "PDF", fileSize = null } = req.body;
+
+  if (!fileName) return sendError(res, "fileName is required.", 400);
+
+  const newExport = await Export.create({
+    clerkUserId: req.clerkUserId,
+    fileName,
+    exportType,
+    fileSize,
+  });
+
+  return sendSuccess(res, "Export saved.", newExport, 201);
+});
+
+/* ── Get all exports for authenticated user ───────────────── */
+exports.getMyExports = asyncHandler(async (req, res) => {
+  const exports = await Export.find({ clerkUserId: req.clerkUserId })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return sendSuccess(res, "Exports retrieved.", exports);
+});
+
+/* ── Delete export — owner only ───────────────────────────── */
+exports.deleteExport = asyncHandler(async (req, res) => {
+  const exportDoc = await Export.findById(req.params.id);
+
+  if (!exportDoc) return sendError(res, "Export not found.", 404);
+
+  // Enforce ownership — user ID from verified token, never from client
+  if (exportDoc.clerkUserId !== req.clerkUserId) {
+    return sendError(res, "Access denied.", 403);
   }
-};
 
-/**
- * DELETE /api/exports/:id
- * Delete a single export record. Only the owner may delete.
- */
-exports.deleteExport = async (req, res) => {
-  try {
-    const exportDoc = await Export.findById(req.params.id);
-
-    if (!exportDoc) {
-      return res.status(404).json({ error: "Export not found" });
+  // Remove from Cloudinary if it was uploaded there
+  if (exportDoc.cloudinaryPublicId) {
+    try {
+      await cloudinary.uploader.destroy(exportDoc.cloudinaryPublicId, { resource_type: "raw" });
+    } catch (err) {
+      // Non-fatal — still delete the DB record
+      logger.error(`Cloudinary PDF delete failed: ${err.message}`);
     }
-
-    if (exportDoc.clerkUserId !== req.clerkUserId) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    await exportDoc.deleteOne();
-    res.json({ message: "Export deleted successfully" });
-  } catch (err) {
-    console.error("deleteExport error:", err);
-    res.status(500).json({ error: "Failed to delete export" });
   }
-};
+
+  await exportDoc.deleteOne();
+
+  return sendSuccess(res, "Export deleted.");
+});

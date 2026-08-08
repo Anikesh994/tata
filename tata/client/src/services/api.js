@@ -14,7 +14,16 @@ const api = axios.create({
 // ── CSV datasets ──────────────────────────────────────────
 export const uploadCSV     = (formData) => api.post("/api/csv/upload", formData);
 export const getDatasets   = ()         => api.get("/api/csv");
-export const getLatest     = ()         => api.get("/api/csv/latest");
+export const getLatest     = (token) => api.get("/api/csv/latest", token
+  ? { headers: { Authorization: `Bearer ${token}` } }
+  : {});
 export const deleteDataset = (id)       => api.delete(`/api/csv/${id}`);
+
+// ── Exports ───────────────────────────────────────────────
+// Sends the PDF binary to the backend — Cloudinary credentials never touch the client
+export const uploadPDF = (formData, token) =>
+  api.post("/api/exports/upload", formData, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 
 export default api;

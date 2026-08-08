@@ -1,34 +1,35 @@
 /**
  * validators/csvValidator.js
- * Express middleware that validates the uploaded file
- * before the request reaches the controller.
- * Keeps validation logic out of business logic.
+ * Validates uploaded file before the controller runs.
+ * Keeps validation separate from business logic.
  */
 
-const { sendError }  = require("../utils/apiResponse");
-const MESSAGES       = require("../constants/messages");
+const { sendError }   = require("../utils/apiResponse");
+const MESSAGES        = require("../constants/messages");
 const { FILE_LIMITS } = require("../constants/fileLimits");
 
-const VALID_MIMES = ["text/csv", "application/vnd.ms-excel", "text/plain"];
+// Browsers can send different MIME types for the same .csv file
+const VALID_MIMES = [
+  "text/csv",
+  "application/csv",
+  "application/vnd.ms-excel",
+  "text/plain",
+  "text/x-csv",
+  "application/octet-stream", // some OS/browser combinations
+];
 
-/**
- * Validates that:
- *  1. A file was attached to the request.
- *  2. The file extension is .csv.
- *  3. The MIME type is acceptable.
- *  4. The file size is within the allowed limit.
- */
 const validateCSVUpload = (req, res, next) => {
   const file = req.file;
 
-  if (!file) {
-    return sendError(res, MESSAGES.NO_FILE_UPLOADED, 400);
+  if (!file) return sendError(res, MESSAGES.NO_FILE_UPLOADED, 400);
+
+  // Extension is the most reliable check — always validate it
+  if (!file.originalname.toLowerCase().endsWith(".csv")) {
+    return sendError(res, MESSAGES.INVALID_FILE_TYPE, 415);
   }
 
-  const hasValidExt  = file.originalname.toLowerCase().endsWith(".csv");
-  const hasValidMime = VALID_MIMES.includes(file.mimetype);
-
-  if (!hasValidExt || !hasValidMime) {
+  // MIME check is secondary — browsers are inconsistent
+  if (!VALID_MIMES.includes(file.mimetype)) {
     return sendError(res, MESSAGES.INVALID_FILE_TYPE, 415);
   }
 
@@ -36,7 +37,6 @@ const validateCSVUpload = (req, res, next) => {
     return sendError(res, MESSAGES.FILE_TOO_LARGE, 413);
   }
 
-  // Validation passed: continue to the upload controller.
   return next();
 };
 

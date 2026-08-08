@@ -14,6 +14,7 @@ const DatasetSchema = new mongoose.Schema(
 
     cloudinaryUrl:      { type: String, required: true },
     cloudinaryPublicId: { type: String, required: true },
+    jsonUrl:            { type: String, default: null },  // parsed rows backup for dashboard recovery
 
     // CSV metadata (derived at upload time, no need to re-download)
     rowCount: { type: Number, required: true },
