@@ -16,8 +16,12 @@ const REQUIRED = [
 const validate = () => {
   const missing = REQUIRED.filter((key) => !process.env[key]);
   if (missing.length) {
-    // Use console here intentionally — logger isn't ready yet
-    console.error(`[ENV] Missing required environment variables: ${missing.join(", ")}`);
+
+    console.error("=================================================");
+    console.error("STARTUP FAILED — Missing environment variables:");
+    missing.forEach((k) => console.error(`  • ${k}`));
+    console.error("Set these in Vercel → Project Settings → Environment Variables");
+    console.error("=================================================");
     process.exit(1);
   }
 };
