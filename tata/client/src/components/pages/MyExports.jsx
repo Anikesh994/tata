@@ -1,22 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
-import { useAuth } from "@clerk/react";
-import api from "../../services/api";
-import Navbar         from "../Navbar";
-import ExportCard     from "../exports/ExportCard";
-import Toast          from "../ui/Toast";
+import { getExports, deleteExport as apiDeleteExport } from "../../services/api";
+import Navbar          from "../Navbar";
+import ExportCard      from "../exports/ExportCard";
+import Toast           from "../ui/Toast";
 import LoadingSkeleton from "../ui/LoadingSkeleton";
-import EmptyState     from "../ui/EmptyState";
+import EmptyState      from "../ui/EmptyState";
 import { getPdfLocally, savePdfLocally, deletePdfLocally } from "../../utils/exportStorage";
 import "./MyExports.css";
 
 export default function MyExports() {
-  const { getToken } = useAuth();
-
   const [exports,     setExports]     = useState([]);
   const [loading,     setLoading]     = useState(true);
-  const [deleting,    setDeleting]    = useState(null); // export _id being deleted
-  const [downloading, setDownloading] = useState(null); // export _id being downloaded
-  const [localAvail,  setLocalAvail]  = useState({});   // { [_id]: boolean }
+  const [deleting,    setDeleting]    = useState(null);
+  const [downloading, setDownloading] = useState(null);
+  const [localAvail,  setLocalAvail]  = useState({});
   const [toast,       setToast]       = useState(null);
 
   const showToast = useCallback((message, type = "success") => {
@@ -25,23 +22,18 @@ export default function MyExports() {
   }, []);
 
   // ── Fetch export list + check IndexedDB availability ─────────────────────
+  // Token is on the axios instance via App.jsx → no manual header needed
   const fetchExports = useCallback(async () => {
     setLoading(true);
     try {
-      const token = await getToken();
-      const res   = await api.get("/api/exports", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // Server returns { success, message, data: [...] }
+      const res  = await getExports();
       const list = res.data?.data ?? [];
       setExports(list);
 
-      // Check which exports are cached in IndexedDB on this device
       const avail = {};
       await Promise.all(
         list.map(async (exp) => {
-          const cached    = await getPdfLocally(exp._id);
-          avail[exp._id] = !!cached;
+          avail[exp._id] = !!(await getPdfLocally(exp._id));
         })
       );
       setLocalAvail(avail);
@@ -50,7 +42,7 @@ export default function MyExports() {
     } finally {
       setLoading(false);
     }
-  }, [getToken, showToast]);
+  }, [showToast]);
 
   useEffect(() => { fetchExports(); }, [fetchExports]);
 
@@ -58,12 +50,10 @@ export default function MyExports() {
   const handleDownload = async (id, fileName, cloudinaryUrl) => {
     setDownloading(id);
     try {
-      // 1. Try local cache first (instant, works offline)
       let dataUri = await getPdfLocally(id);
 
       if (!dataUri) {
         if (cloudinaryUrl) {
-          // 2. Not cached — fetch from Cloudinary and cache for next time
           const res = await fetch(cloudinaryUrl);
           if (!res.ok) throw new Error("Cloudinary fetch failed");
           const blob = await res.blob();
@@ -80,7 +70,6 @@ export default function MyExports() {
         }
       }
 
-      // Trigger browser download
       const link = document.createElement("a");
       link.href = dataUri;
       link.download = fileName;
@@ -99,10 +88,7 @@ export default function MyExports() {
   const handleDelete = async (id) => {
     setDeleting(id);
     try {
-      const token = await getToken();
-      await api.delete(`/api/exports/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiDeleteExport(id);
       await deletePdfLocally(id);
       setExports((prev) => prev.filter((e) => e._id !== id));
       showToast("Export deleted.", "success");
@@ -138,13 +124,9 @@ export default function MyExports() {
           </button>
         </div>
 
-        {/* Loading state */}
         {loading && <LoadingSkeleton />}
-
-        {/* Empty state */}
         {!loading && exports.length === 0 && <EmptyState />}
 
-        {/* Exports grid */}
         {!loading && exports.length > 0 && (
           <>
             <p className="me-count">{exports.length} export{exports.length !== 1 ? "s" : ""}</p>

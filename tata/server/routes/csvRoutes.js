@@ -10,7 +10,7 @@ const { uploadCSV, getDatasets, getLatestDataset, deleteDataset } =
   require("../controllers/csvController");
 const { validateCSVUpload }    = require("../validators/csvValidator");
 const { FILE_LIMITS }          = require("../constants/fileLimits");
-const optionalAuth             = require("../middleware/optionalAuth");
+const requireAuth              = require("../middleware/requireAuth");
 
 const router = express.Router();
 
@@ -19,8 +19,8 @@ const upload = multer({
   limits:  { fileSize: FILE_LIMITS.MAX_SIZE_BYTES },
 });
 
-// optionalAuth attaches req.clerkUserId when a token is present
-router.use(optionalAuth);
+// All CSV routes require authentication
+router.use(requireAuth);
 
 router.post(   "/upload",    upload.single("file"), validateCSVUpload, uploadCSV);
 router.get(    "/",          getDatasets);

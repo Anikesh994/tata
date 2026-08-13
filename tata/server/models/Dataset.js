@@ -1,35 +1,49 @@
 /**
  * models/Dataset.js
- * Stores only CSV metadata — the original file lives in Cloudinary.
- * No raw row data in MongoDB → no document size issues.
+ * Metadata only — raw CSV and parsed JSON live in Cloudinary.
+ *
+ * Migration note:
+ *   Existing documents use "uploadedBy" instead of "clerkUserId".
+ *   Both fields are included here so old records are still readable.
+ *   New writes always use "clerkUserId".
+ *   Run a one-off migration if you need to query old records by owner:
+ *     db.datasets.updateMany({ uploadedBy: { $exists: true }, clerkUserId: { $exists: false } },
+ *                             [{ $set: { clerkUserId: "$uploadedBy" } }])
  */
 
 const mongoose = require("mongoose");
 
 const DatasetSchema = new mongoose.Schema(
   {
-    // Original file info
     name:     { type: String, required: true, trim: true, maxlength: 255 },
-    fileSize: { type: Number, required: true },   // bytes
+    fileSize: { type: Number, required: true },
 
+    // Cloudinary references — original CSV
     cloudinaryUrl:      { type: String, required: true },
     cloudinaryPublicId: { type: String, required: true },
-    jsonUrl:            { type: String, default: null },  // parsed rows backup for dashboard recovery
 
-    // CSV metadata (derived at upload time, no need to re-download)
+    // Cloudinary references — parsed JSON backup (for dashboard recovery)
+    jsonUrl:      { type: String, default: null },
+    jsonPublicId: { type: String, default: null },
+
+    // CSV metadata
     rowCount: { type: Number, required: true },
     columns:  { type: [String], required: true },
 
-    // Auth — Clerk user ID, enables per-user isolation later
-    uploadedBy: { type: String, default: null, index: true },
+    // Owner — standardised to clerkUserId
+    clerkUserId: { type: String, index: true, default: null },
+
+    // Legacy field kept for backward compatibility with existing documents.
+    // Do not write to this field — use clerkUserId for all new code.
+    uploadedBy: { type: String, default: null },
   },
   {
-    timestamps: true,   
-    versionKey: false,  // removes noisy __v field
+    timestamps: true,
+    versionKey: false,
   }
 );
 
-// Compound index: list a user's datasets sorted by newest first
-DatasetSchema.index({ uploadedBy: 1, createdAt: -1 });
+// Fast lookup: all datasets for a user, newest first
+DatasetSchema.index({ clerkUserId: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Dataset", DatasetSchema);

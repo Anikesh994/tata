@@ -1,29 +1,41 @@
 /**
  * services/api.js
- * Single axios instance — one place to change the base URL,
- * timeouts, or add auth headers globally.
+ * Single axios instance for all API calls.
+ *
+ * Auth:
+ *   Call setAuthToken(token) once after Clerk loads to attach the
+ *   Bearer token to every outgoing request automatically.
+ *   All CSV and export routes require authentication.
  */
 
 import axios from "axios";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
-  timeout: 30_000, // 30 s — generous for serverless cold starts
+  timeout: 30_000,
 });
+
+/**
+ * Attach (or remove) the Clerk session token on the shared axios instance.
+ * Called from the top-level App or a layout component after Clerk loads.
+ */
+export const setAuthToken = (token) => {
+  if (token) {
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.common["Authorization"];
+  }
+};
 
 // ── CSV datasets ──────────────────────────────────────────
 export const uploadCSV     = (formData) => api.post("/api/csv/upload", formData);
 export const getDatasets   = ()         => api.get("/api/csv");
-export const getLatest     = (token) => api.get("/api/csv/latest", token
-  ? { headers: { Authorization: `Bearer ${token}` } }
-  : {});
+export const getLatest     = ()         => api.get("/api/csv/latest");
 export const deleteDataset = (id)       => api.delete(`/api/csv/${id}`);
 
 // ── Exports ───────────────────────────────────────────────
-// Sends the PDF binary to the backend — Cloudinary credentials never touch the client
-export const uploadPDF = (formData, token) =>
-  api.post("/api/exports/upload", formData, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+export const uploadPDF     = (formData) => api.post("/api/exports/upload", formData);
+export const getExports    = ()         => api.get("/api/exports");
+export const deleteExport  = (id)       => api.delete(`/api/exports/${id}`);
 
 export default api;

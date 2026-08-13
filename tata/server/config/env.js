@@ -1,7 +1,8 @@
 /**
  * config/env.js
- * Validates all required environment variables at startup.
- * The app will refuse to start if any are missing — fail fast.
+ * Validates required environment variables at startup.
+ * Throws an Error (instead of process.exit) so the caller
+ * can decide whether to crash — cleaner in serverless environments.
  */
 
 const REQUIRED = [
@@ -16,13 +17,10 @@ const REQUIRED = [
 const validate = () => {
   const missing = REQUIRED.filter((key) => !process.env[key]);
   if (missing.length) {
-
-    console.error("=================================================");
-    console.error("STARTUP FAILED — Missing environment variables:");
-    missing.forEach((k) => console.error(`  • ${k}`));
-    console.error("Set these in Vercel → Project Settings → Environment Variables");
-    console.error("=================================================");
-    process.exit(1);
+    throw new Error(
+      `Missing required environment variables: ${missing.join(", ")}\n` +
+      "Set these in Vercel → Project Settings → Environment Variables"
+    );
   }
 };
 

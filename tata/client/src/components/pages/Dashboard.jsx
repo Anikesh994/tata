@@ -3,7 +3,6 @@ import { uploadCSV as apiUpload, getLatest, uploadPDF as apiUploadPDF } from "..
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
-import { useAuth } from "@clerk/react";
 import Navbar from "../Navbar";
 import ChartDisplay from "../ChartDisplay";
 import UploadCard from "../dashboard/UploadCard";
@@ -14,8 +13,6 @@ import { savePdfLocally } from "../../utils/exportStorage";
 import "./Dashboard.css";
 
 export default function Dashboard() {
-  const { getToken } = useAuth();
-
   const [data,         setData]         = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [file,         setFile]         = useState(null);
@@ -25,9 +22,8 @@ export default function Dashboard() {
   const [toast,        setToast]        = useState(null);
 
   const fileInputRef = useRef(null);
-  const chartRef     = useRef(null); // points to chart-card div so exportPDF can grab the canvas
+  const chartRef     = useRef(null);
 
-  // ── Toast helper ─────────────────────────────────────────────────────────
   const showToast = useCallback((message, type = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -38,13 +34,13 @@ export default function Dashboard() {
     let cancelled = false;
     const restore = async () => {
       try {
-        const token   = await getToken();
-        const res     = await getLatest(token); // optionalAuth scopes to this user
-        const meta    = res.data?.data;
+        // Token is already on the axios instance via App.jsx → setAuthToken
+        const res  = await getLatest();
+        const meta = res.data?.data;
         if (!meta?.jsonUrl || cancelled) return;
         const jsonRes = await fetch(meta.jsonUrl);
         if (!jsonRes.ok  || cancelled) return;
-        const rows    = await jsonRes.json();
+        const rows = await jsonRes.json();
         if (!cancelled && Array.isArray(rows) && rows.length) {
           setData(rows);
           setFilteredData(rows);
@@ -229,17 +225,13 @@ export default function Dashboard() {
     doc.save(fileName);
 
     // Upload to backend → Cloudinary (server-side credentials)
+    // Upload to backend → Cloudinary (token is on axios instance via App.jsx)
     try {
-      const token = await getToken();
-      if (!token) {
-        showToast("PDF downloaded. Please sign in to save to My Exports.", "error");
-        return;
-      }
       const formData = new FormData();
       formData.append("file", new File([blob], fileName, { type: "application/pdf" }));
-      const res      = await apiUploadPDF(formData, token);
+      const res      = await apiUploadPDF(formData);
       const exportId = res.data?.data?._id;
-      if (exportId) await savePdfLocally(exportId, dataUri); // cache in IndexedDB
+      if (exportId) await savePdfLocally(exportId, dataUri);
       showToast("PDF exported and saved to My Exports!", "success");
     } catch (err) {
       const msg = err?.response?.data?.message || "Failed to save to My Exports.";
