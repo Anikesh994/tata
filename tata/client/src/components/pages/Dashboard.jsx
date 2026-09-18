@@ -13,13 +13,15 @@ import { savePdfLocally } from "../../utils/exportStorage";
 import "./Dashboard.css";
 
 export default function Dashboard() {
-  const [data,         setData]         = useState([]);
-  const [filteredData, setFilteredData] = useState([]);
-  const [file,         setFile]         = useState(null);
-  const [search,       setSearch]       = useState("");
-  const [uploading,    setUploading]    = useState(false);
-  const [dragOver,     setDragOver]     = useState(false);
-  const [toast,        setToast]        = useState(null);
+  const [data,            setData]            = useState([]);
+  const [filteredData,    setFilteredData]    = useState([]);
+  const [file,            setFile]            = useState(null);
+  const [search,          setSearch]          = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [metricKey,       setMetricKey]       = useState("");
+  const [uploading,       setUploading]       = useState(false);
+  const [dragOver,        setDragOver]        = useState(false);
+  const [toast,           setToast]           = useState(null);
 
   const fileInputRef = useRef(null);
   const chartRef     = useRef(null);
@@ -28,6 +30,20 @@ export default function Dashboard() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   }, []);
+
+  const numericKeys = useMemo(() => {
+    if (!data.length) return [];
+    const sample = data.slice(0, 50);
+    return Object.keys(data[0]).filter((k) => {
+      const nonEmpty = sample.filter((r) => r[k] !== "" && r[k] != null);
+      if (!nonEmpty.length) return false;
+      return nonEmpty.filter((r) => Number.isFinite(parseFloat(r[k]))).length / nonEmpty.length >= 0.8;
+    });
+  }, [data]);
+
+  useEffect(() => {
+    if (numericKeys.length) setMetricKey((prev) => (numericKeys.includes(prev) ? prev : numericKeys[0]));
+  }, [numericKeys]);
 
   // ── Mount: silently restore last dataset from Cloudinary ─────────────────
   useEffect(() => {
@@ -55,14 +71,19 @@ export default function Dashboard() {
 
   // ── Search filter ─────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!search.trim()) { setFilteredData(data); return; }
-    const q = search.toLowerCase();
+    const id = setTimeout(() => setDebouncedSearch(search), 800);
+    return () => clearTimeout(id);
+  }, [search]);
+
+  useEffect(() => {
+    if (!debouncedSearch.trim()) { setFilteredData(data); return; }
+    const q = debouncedSearch.toLowerCase();
     setFilteredData(
       data.filter((row) =>
         Object.values(row).some((v) => v?.toString().toLowerCase().includes(q))
       )
     );
-  }, [search, data]);
+  }, [debouncedSearch, data]);
 
   // ── CSV upload ────────────────────────────────────────────────────────────
   const handleUpload = async () => {
@@ -83,6 +104,7 @@ export default function Dashboard() {
       setData(uploaded);
       setFilteredData(uploaded);
       setSearch("");
+      setDebouncedSearch("");
       showToast("CSV uploaded successfully!", "success");
       setFile(null);
     } catch (err) {
@@ -103,22 +125,16 @@ export default function Dashboard() {
 
   // ── Summary stats (memoised — recalculates only when filteredData changes) ─
   const summary = useMemo(() => {
-    if (!filteredData.length) return { total: "—", average: "—", rows: 0, key: "" };
-    const keys = Object.keys(filteredData[0]);
-    let valueKey = keys[0];
-    for (const k of keys) {
-      if (!isNaN(parseFloat(filteredData[0][k]))) { valueKey = k; break; }
-    }
-    const vals  = filteredData.map((r) => parseFloat(r[valueKey])).filter(Number.isFinite);
-    if (!vals.length) return { total: "—", average: "—", rows: filteredData.length, key: valueKey };
+    if (!filteredData.length || !metricKey) return { total: "—", average: "—", rows: 0 };
+    const vals = filteredData.map((r) => parseFloat(r[metricKey])).filter(Number.isFinite);
+    if (!vals.length) return { total: "—", average: "—", rows: filteredData.length };
     const total = vals.reduce((a, b) => a + b, 0);
     return {
       total:   total.toLocaleString(undefined, { maximumFractionDigits: 2 }),
       average: (total / vals.length).toLocaleString(undefined, { maximumFractionDigits: 2 }),
       rows:    filteredData.length,
-      key:     valueKey,
     };
-  }, [filteredData]);
+  }, [filteredData, metricKey]);
 
   // ── PDF export ────────────────────────────────────────────────────────────
   //
@@ -224,7 +240,6 @@ export default function Dashboard() {
     const blob    = doc.output("blob");
     doc.save(fileName);
 
-    // Upload to backend → Cloudinary (server-side credentials)
     // Upload to backend → Cloudinary (token is on axios instance via App.jsx)
     try {
       const formData = new FormData();
@@ -240,7 +255,7 @@ export default function Dashboard() {
   };
 
   const headers = filteredData.length ? Object.keys(filteredData[0]) : [];
-  const { total, average, rows, key } = summary;
+  const { total, average, rows } = summary;
 
   return (
     <div className="dash-page">
@@ -278,8 +293,22 @@ export default function Dashboard() {
             onUpload={handleUpload}
             fileInputRef={fileInputRef}
           />
-          <StatCard label="Total Value"   value={total}   dataKey={key} pill="∑ Sum"  pillClass="stat-pill-blue" />
-          <StatCard label="Average Value" value={average} dataKey={key} pill="⌀ Mean" pillClass="stat-pill-violet" />
+          <StatCard
+            label="Total Value"
+            value={total}
+            dataKey={metricKey}
+            pill="∑ Sum"
+            pillClass="stat-pill-blue"
+            numericKeys={numericKeys}
+            onKeyChange={setMetricKey}
+          />
+          <StatCard
+            label="Average Value"
+            value={average}
+            dataKey={metricKey}
+            pill="⌀ Mean"
+            pillClass="stat-pill-violet"
+          />
         </div>
 
         {/* Row count badge */}

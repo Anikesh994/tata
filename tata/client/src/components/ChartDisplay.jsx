@@ -14,48 +14,86 @@ ChartJS.register(
 
 const PALETTE = ["#38bdf8","#818cf8","#f472b6","#2dd4bf","#fb923c","#a3e635","#e879f9","#34d399"];
 
-/** Derive sensible default keys from a row array */
+function isNumericColumn(rows, key) {
+  const sample = rows.length > 50 ? rows.filter((_, i) => i % Math.floor(rows.length / 50) === 0).slice(0, 50) : rows;
+  const nonEmpty = sample.filter((r) => r[key] !== "" && r[key] != null);
+  if (!nonEmpty.length) return false;
+  const numericCount = nonEmpty.filter((r) => Number.isFinite(parseFloat(r[key]))).length;
+  return numericCount / nonEmpty.length >= 0.8;
+}
+
 function getDefaultKeys(rows) {
   if (!rows.length) return { xKey: "", yKey: "" };
   const keys = Object.keys(rows[0]);
   const xKey = keys[0];
-  let yKey = keys[1] || keys[0];
-  for (const k of keys) {
-    if (!isNaN(parseFloat(rows[0][k]))) { yKey = k; break; }
-  }
+  const numericKeys = keys.filter((k) => isNumericColumn(rows, k));
+  const yKey = numericKeys.length ? numericKeys[0] : (keys[1] || keys[0]);
   return { xKey, yKey };
 }
 
+function aggregateRows(rows, xKey, yKey) {
+  if (!rows.length) return { labels: [], values: [] };
+
+  const numeric = isNumericColumn(rows, yKey);
+
+  if (numeric) {
+    // Group by X label and sum the Y values.
+    // Duplicate X values (e.g. "Male" appearing 50 times) get merged into one bar.
+    // Unique X values are kept as-is — nothing gets hidden or bucketed.
+    const sums = {};
+    const order = [];
+    for (const r of rows) {
+      const label = String(r[xKey] ?? "—");
+      const val   = parseFloat(r[yKey]) || 0;
+      if (!(label in sums)) { sums[label] = 0; order.push(label); }
+      sums[label] += val;
+    }
+    return {
+      labels: order,
+      values: order.map((l) => sums[l]),
+    };
+  }
+
+  // Non-numeric Y — count occurrences per X label
+  const counts = {};
+  const order  = [];
+  for (const r of rows) {
+    const label = String(r[xKey] ?? "—");
+    if (!(label in counts)) { counts[label] = 0; order.push(label); }
+    counts[label] += 1;
+  }
+  return {
+    labels: order,
+    values: order.map((l) => counts[l]),
+  };
+}
+
 const ChartDisplay = ({ rows = [] }) => {
-  // Initialise keys immediately from rows so first render is never blank
   const [xKey,      setXKey]      = useState(() => getDefaultKeys(rows).xKey);
   const [yKey,      setYKey]      = useState(() => getDefaultKeys(rows).yKey);
   const [chartType, setChartType] = useState("bar");
 
-  // Reset keys whenever a NEW dataset arrives (upload)
   useEffect(() => {
     const { xKey: x, yKey: y } = getDefaultKeys(rows);
     setXKey(x);
     setYKey(y);
   }, [rows]);
 
-  const keys = rows.length ? Object.keys(rows[0]) : [];
+  const keys        = rows.length ? Object.keys(rows[0]) : [];
+  const numericKeys = useMemo(() => keys.filter((k) => isNumericColumn(rows, k)), [rows, keys.join(",")]);
 
-  // Memoise chart data so it only rebuilds when inputs change
   const chartData = useMemo(() => {
     if (!rows.length || !xKey || !yKey) return null;
-
+    const { labels, values } = aggregateRows(rows, xKey, yKey);
+    if (!labels.length) return null;
     const isDoughnut = chartType === "pie";
-    const values = rows.map((r) => parseFloat(r[yKey]) || 0);
-    const labels = rows.map((r) => String(r[xKey] ?? "—"));
-
     return {
       labels,
       datasets: [{
         label: yKey,
         data:  values,
         backgroundColor: isDoughnut
-          ? PALETTE.slice(0, values.length)
+          ? PALETTE.slice(0, values.length).map((c, i) => PALETTE[i % PALETTE.length])
           : "rgba(56, 189, 248, 0.75)",
         borderColor: isDoughnut
           ? PALETTE.slice(0, values.length).map((c) => c + "bb")
@@ -69,7 +107,7 @@ const ChartDisplay = ({ rows = [] }) => {
         pointBackgroundColor:      "#38bdf8",
         pointBorderColor:          "#080b14",
         pointBorderWidth:          2,
-        pointRadius:               4,
+        pointRadius:               rows.length > 500 ? 0 : 4,
         pointHoverRadius:          7,
         pointHoverBackgroundColor: "#f8fafc",
       }],
@@ -79,7 +117,7 @@ const ChartDisplay = ({ rows = [] }) => {
   const baseOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
-    animation: { duration: 450 },
+    animation: { duration: rows.length > 1000 ? 0 : 450 },
     plugins: {
       legend: {
         labels: {
@@ -104,7 +142,7 @@ const ChartDisplay = ({ rows = [] }) => {
         callbacks: { label: (ctx) => `  ${ctx.dataset.label}: ${ctx.formattedValue}` },
       },
     },
-  }), []);
+  }), [rows.length]);
 
   const axisOptions = useMemo(() => ({
     ...baseOptions,
@@ -123,7 +161,6 @@ const ChartDisplay = ({ rows = [] }) => {
     },
   }), [baseOptions]);
 
-  // ── Empty state ──────────────────────────────────────────
   if (!rows.length) {
     return (
       <div className="chart-empty-state">
@@ -133,17 +170,16 @@ const ChartDisplay = ({ rows = [] }) => {
     );
   }
 
-  // Guard: keys not ready yet (should be instant with lazy init, but just in case)
   if (!chartData) return null;
+
+  const yAxisOpts = numericKeys.length ? numericKeys : keys;
 
   return (
     <div className="chart-wrapper">
-
-      {/* ── Controls ── */}
       <div className="chart-controls">
         {[
           { label: "X Axis",           val: xKey,      set: setXKey,  opts: keys },
-          { label: "Y Axis (numeric)", val: yKey,      set: setYKey,  opts: keys },
+          { label: "Y Axis (numeric)", val: yKey,      set: setYKey,  opts: yAxisOpts },
           {
             label: "Chart Type", val: chartType, set: setChartType,
             opts: [
@@ -162,7 +198,7 @@ const ChartDisplay = ({ rows = [] }) => {
             >
               {opts.map((o) =>
                 typeof o === "string"
-                  ? <option key={o}   value={o}  >{o}  </option>
+                  ? <option key={o}   value={o}  >{o}</option>
                   : <option key={o.v} value={o.v}>{o.l}</option>
               )}
             </select>
@@ -170,13 +206,11 @@ const ChartDisplay = ({ rows = [] }) => {
         ))}
       </div>
 
-      {/* ── Canvas ── height set inline so Chart.js always has a container size */}
       <div className="chart-canvas-wrap">
         {chartType === "bar"  && <Bar      data={chartData} options={axisOptions} />}
         {chartType === "line" && <Line     data={chartData} options={axisOptions} />}
         {chartType === "pie"  && <Doughnut data={chartData} options={baseOptions} />}
       </div>
-
     </div>
   );
 };

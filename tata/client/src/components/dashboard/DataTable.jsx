@@ -1,19 +1,5 @@
-/**
- * components/dashboard/DataTable.jsx
- * Searchable data table with empty state.
- * Extracted from Dashboard.jsx; all CSS classes preserved.
- *
- * Props:
- *  headers       — string[]       column headers
- *  filteredData  — object[]       rows to display
- *  search        — string         current search term
- *  onSearch      — (value) => void
- */
-
 const DataTable = ({ headers, filteredData, search, onSearch }) => (
   <div className="dash-card table-card">
-
-    {/* Header row: title + search */}
     <div className="table-header">
       <h2 className="table-title">Data Table</h2>
       <div className="search-wrap">
@@ -31,8 +17,6 @@ const DataTable = ({ headers, filteredData, search, onSearch }) => (
         />
       </div>
     </div>
-
-    {/* Scrollable table or empty state */}
     <div className="table-scroll">
       {filteredData.length > 0 ? (
         <table className="data-table">
@@ -56,7 +40,6 @@ const DataTable = ({ headers, filteredData, search, onSearch }) => (
         </div>
       )}
     </div>
-
   </div>
 );
 
