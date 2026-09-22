@@ -19,9 +19,12 @@ export default function Dashboard() {
   const [search,          setSearch]          = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [metricKey,       setMetricKey]       = useState("");
+  const [page,            setPage]            = useState(1);
   const [uploading,       setUploading]       = useState(false);
   const [dragOver,        setDragOver]        = useState(false);
   const [toast,           setToast]           = useState(null);
+
+  const PAGE_SIZE = 25;
 
   const fileInputRef = useRef(null);
   const chartRef     = useRef(null);
@@ -76,13 +79,14 @@ export default function Dashboard() {
   }, [search]);
 
   useEffect(() => {
-    if (!debouncedSearch.trim()) { setFilteredData(data); return; }
+    if (!debouncedSearch.trim()) { setFilteredData(data); setPage(1); return; }
     const q = debouncedSearch.toLowerCase();
     setFilteredData(
       data.filter((row) =>
         Object.values(row).some((v) => v?.toString().toLowerCase().includes(q))
       )
     );
+    setPage(1);
   }, [debouncedSearch, data]);
 
   // ── CSV upload ────────────────────────────────────────────────────────────
@@ -105,6 +109,7 @@ export default function Dashboard() {
       setFilteredData(uploaded);
       setSearch("");
       setDebouncedSearch("");
+      setPage(1);
       showToast("CSV uploaded successfully!", "success");
       setFile(null);
     } catch (err) {
@@ -254,8 +259,11 @@ export default function Dashboard() {
     }
   };
 
-  const headers = filteredData.length ? Object.keys(filteredData[0]) : [];
+  const headers  = filteredData.length ? Object.keys(filteredData[0]) : [];
   const { total, average, rows } = summary;
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages);
+  const pageData   = filteredData.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <div className="dash-page">
@@ -321,9 +329,12 @@ export default function Dashboard() {
         {/* Data table */}
         <DataTable
           headers={headers}
-          filteredData={filteredData}
+          filteredData={pageData}
           search={search}
           onSearch={setSearch}
+          page={safePage}
+          totalPages={totalPages}
+          onPageChange={setPage}
         />
 
         {/* Chart — chartRef lets exportPDF grab the canvas directly */}

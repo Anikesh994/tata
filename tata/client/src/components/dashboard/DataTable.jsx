@@ -1,4 +1,4 @@
-const DataTable = ({ headers, filteredData, search, onSearch }) => (
+const DataTable = ({ headers, filteredData, search, onSearch, page, totalPages, onPageChange }) => (
   <div className="dash-card table-card">
     <div className="table-header">
       <h2 className="table-title">Data Table</h2>
@@ -40,6 +40,25 @@ const DataTable = ({ headers, filteredData, search, onSearch }) => (
         </div>
       )}
     </div>
+    {totalPages > 1 && (
+      <div className="pagination">
+        <button
+          className="page-btn"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+        >
+          ← Prev
+        </button>
+        <span className="page-info">Page {page} of {totalPages}</span>
+        <button
+          className="page-btn"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+        >
+          Next →
+        </button>
+      </div>
+    )}
   </div>
 );
 
